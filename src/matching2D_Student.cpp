@@ -1,6 +1,6 @@
 
-#include <numeric>
 #include "matching2D.hpp"
+#include <numeric>
 
 using namespace std;
 
