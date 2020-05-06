@@ -135,13 +135,35 @@ void show3DObjects(std::vector<BoundingBox> &boundingBoxes, cv::Size worldSize, 
     }
 }
 
+cv::Rect shrinkBoundingBox(const BoundingBox &originalBoundingBox, const float &shrinkFactor)
+{
+    cv::Rect smallerBox;
+    smallerBox.x = originalBoundingBox.roi.x + shrinkFactor * originalBoundingBox.roi.width / 2.0;
+    smallerBox.y = originalBoundingBox.roi.y + shrinkFactor * originalBoundingBox.roi.height / 2.0;
+    smallerBox.width = originalBoundingBox.roi.width * (1 - shrinkFactor);
+    smallerBox.height = originalBoundingBox.roi.height * (1 - shrinkFactor);
+    return smallerBox;
+}
+
 // associate a given bounding box with the keypoints boundingBoxPrev contains
-void clusterKptMatchesWithROI(BoundingBox &boundingBox,
+void clusterKptMatchesWithROI(BoundingBox &boundingBoxCurr,
                               std::vector<cv::KeyPoint> &kptsPrev,
                               std::vector<cv::KeyPoint> &kptsCurr,
                               std::vector<cv::DMatch> &kptMatches)
 {
-    // ...
+    float shrinkFactor = 0.1; // Shrink bounding boxes 10% to reduce outliers
+    cv::Rect smallerBoxCurr = shrinkBoundingBox(boundingBoxCurr, shrinkFactor);
+
+    // Loop over each match to see if both boudning boxes contain keypoints
+    for (auto match : kptMatches)
+    {
+        int currKeyPointIdx = match.trainIdx;
+        cv::Point currKeyPoint = kptsCurr.at(currKeyPointIdx).pt;
+        if (smallerBoxCurr.contains(currKeyPoint))
+        {
+            boundingBoxCurr.kptMatches.push_back(match);
+        }
+    }
 }
 
 // Compute time-to-collision (TTC) based on keypoint correspondences in successive images
