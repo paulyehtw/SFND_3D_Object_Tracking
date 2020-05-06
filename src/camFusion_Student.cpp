@@ -135,13 +135,35 @@ void show3DObjects(std::vector<BoundingBox> &boundingBoxes, cv::Size worldSize, 
     }
 }
 
+cv::Rect shrinkBoundingBox(const BoundingBox &originalBoundingBox, const float &shrinkFactor)
+{
+    cv::Rect smallerBox;
+    smallerBox.x = originalBoundingBox.roi.x + shrinkFactor * originalBoundingBox.roi.width / 2.0;
+    smallerBox.y = originalBoundingBox.roi.y + shrinkFactor * originalBoundingBox.roi.height / 2.0;
+    smallerBox.width = originalBoundingBox.roi.width * (1 - shrinkFactor);
+    smallerBox.height = originalBoundingBox.roi.height * (1 - shrinkFactor);
+    return smallerBox;
+}
+
 // associate a given bounding box with the keypoints boundingBoxPrev contains
-void clusterKptMatchesWithROI(BoundingBox &boundingBox,
+void clusterKptMatchesWithROI(BoundingBox &boundingBoxCurr,
                               std::vector<cv::KeyPoint> &kptsPrev,
                               std::vector<cv::KeyPoint> &kptsCurr,
                               std::vector<cv::DMatch> &kptMatches)
 {
-    // ...
+    float shrinkFactor = 0.1; // Shrink bounding boxes 10% to reduce outliers
+    cv::Rect smallerBoxCurr = shrinkBoundingBox(boundingBoxCurr, shrinkFactor);
+
+    // Loop over each match to see if boudning box contains keypoints
+    for (auto match : kptMatches)
+    {
+        int currKeyPointIdx = match.trainIdx;
+        cv::Point currKeyPoint = kptsCurr.at(currKeyPointIdx).pt;
+        if (smallerBoxCurr.contains(currKeyPoint))
+        {
+            boundingBoxCurr.kptMatches.push_back(match);
+        }
+    }
 }
 
 // Compute time-to-collision (TTC) based on keypoint correspondences in successive images
@@ -149,10 +171,49 @@ void computeTTCCamera(std::vector<cv::KeyPoint> &kptsPrev,
                       std::vector<cv::KeyPoint> &kptsCurr,
                       std::vector<cv::DMatch> kptMatches,
                       double frameRate,
-                      double &TTC,
-                      cv::Mat *visImg)
+                      double &TTC)
 {
-    // ...
+    double dt = 1.0 / frameRate;
+    // Compute distance ratios on every pair of keypoints, O(n^2) on the number of matches contained within the ROI
+    vector<double> distRatios;
+    for (auto itrFirstMatch = kptMatches.begin(); itrFirstMatch != kptMatches.end() - 1; ++itrFirstMatch)
+    {
+        // First points in previous and current frame
+        cv::KeyPoint kptFirstCurr = kptsCurr.at(itrFirstMatch->trainIdx);
+        cv::KeyPoint kptFirstPrev = kptsPrev.at(itrFirstMatch->queryIdx);
+
+        for (auto itrSecondMatch = kptMatches.begin() + 1; itrSecondMatch != kptMatches.end(); ++itrSecondMatch)
+        {
+            cv::KeyPoint kptSecondCurr = kptsCurr.at(itrSecondMatch->trainIdx);
+            cv::KeyPoint kptSecondPrev = kptsPrev.at(itrSecondMatch->queryIdx);
+
+            // Compute distances for previous and current frame
+            double distCurr = cv::norm(kptFirstCurr.pt - kptSecondCurr.pt);
+            double distPrev = cv::norm(kptFirstPrev.pt - kptSecondPrev.pt);
+
+            double minDist = 100.0; // Threshold the calculated distRatios by requiring a minimum current distance
+
+            // Avoid division by zero and apply the threshold
+            if (distPrev > std::numeric_limits<double>::epsilon() && distCurr >= minDist)
+            {
+                double distRatio = distCurr / distPrev;
+                distRatios.push_back(distRatio);
+            }
+        }
+    }
+
+    // Only continue if the vector of distRatios is not empty
+    if (distRatios.size() == 0)
+    {
+        TTC = std::numeric_limits<double>::quiet_NaN();
+        return;
+    }
+
+    // Use the median to exclude outliers
+    std::sort(distRatios.begin(), distRatios.end());
+    double medianDistRatio = distRatios[distRatios.size() / 2];
+
+    TTC = -dt / (1 - medianDistRatio);
 }
 
 void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
