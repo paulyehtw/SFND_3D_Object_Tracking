@@ -160,7 +160,28 @@ void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
                      double frameRate,
                      double &TTC)
 {
-    // ...
+    double dt = 1.0 / frameRate;
+    double minXPrev = 1e9, minXCurr = 1e9;
+
+    // Find closest distance to Lidar points
+    for (auto itrPointsPrev = lidarPointsPrev.begin(); itrPointsPrev != lidarPointsPrev.end(); ++itrPointsPrev)
+    {
+        if (itrPointsPrev->x < minXPrev)
+        {
+            minXPrev = itrPointsPrev->x;
+        }
+    }
+
+    for (auto itrPointsCurr = lidarPointsCurr.begin(); itrPointsCurr != lidarPointsCurr.end(); ++itrPointsCurr)
+    {
+        if (itrPointsCurr->x < minXCurr)
+        {
+            minXCurr = itrPointsCurr->x;
+        }
+    }
+
+    // compute TTC from both measurements
+    TTC = minXCurr * dt / (minXPrev - minXCurr);
 }
 
 void matchBoundingBoxes(std::vector<cv::DMatch> &matches,
