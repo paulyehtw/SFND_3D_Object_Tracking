@@ -253,8 +253,37 @@ void computeTTCCamera(std::vector<cv::KeyPoint> &kptsPrev,
 ```
 
 ### FP.5 Performance Evaluation 1
-In some of the frames like(11,12) and (16,17), TTC of Lidar can lead to negative as the procceding car is actually accelerating, thus the method should be adapted to this case.
+In some of the frames like(11,12) and (16,17) shown below, TTC of Lidar can lead to negative as the procceding car is actually accelerating, thus the method should be adapted to this case.
+<p align="center">
+  <img  src="https://github.com/paulyehtw/SFND_3D_Object_Tracking/blob/master/results/frame11_12.jpg">
+</p>
+<p align="center">
+  <img  src="https://github.com/paulyehtw/SFND_3D_Object_Tracking/blob/master/results/frame16_17.jpg">
+</p>
 
 ### FP.6 Performance Evaluation 2
 From the performance evaluation results from Midterm Project, Top 3 suggestion works pretty well, I choose **FAST/BRIEF** as the combination as it's fast and it detects relatively more keypoints. The TTC from camera is quite stable and realistic, also it is quite consistent with TTC from Lidar.
 As for combination of for excample HARRIS/ORB, the TTC output from camera becomes really unstable. Sometimes TTC is `NaN` or `inf` because there are too few keypoints detected or matches found.
+
+Results of each frame for bad Detector/Descriptor combination are in the left part of the table below, good combination is listed in the right part.
+
+| Frame | Combination | TTC Lidar | TTC Camera | Combination | TTC Lidar | TTC Camera |
+| --- | --- | --- |--- | --- | --- |--- |
+|0/1 | HARRIS/ORB |12.9722 | nan|FAST/BRIEF |12.9722 | 12.1312|
+|1/2 | HARRIS/ORB |12.264 | -inf|FAST/BRIEF | 12.264 | 10.7908|
+|2/3 | HARRIS/ORB |13.9161 | 93.2924|FAST/BRIEF |13.9161 | 12.5844|
+|3/4 | HARRIS/ORB |7.11572 | 12.6321|FAST/BRIEF |7.11572 | 14.1171|
+|4/5 | HARRIS/ORB |16.2511 | 12.5624|FAST/BRIEF |16.2511 | 14.7374|
+|5/6 | HARRIS/ORB |12.4213 | nan|FAST/BRIEF |12.4213 | 13.0071|
+|6/7 | HARRIS/ORB |34.3404 | -inf|FAST/BRIEF | 34.3404 | 13.5165|
+|7/8 | HARRIS/ORB |9.34376 | 12.9486|FAST/BRIEF |9.34376 | 32.985|
+|8/9 | HARRIS/ORB |18.1318 | nan|FAST/BRIEF |18.1318 | 12.7521|
+|9/10 | HARRIS/ORB |18.0318 | nan|FAST/BRIEF |18.0318 | 11.5258|
+|10/11 | HARRIS/ORB |3.83244 | nan|FAST/BRIEF |3.83244 | 12.1|
+|11/12 | HARRIS/ORB |-10.8537 | nan|FAST/BRIEF |-10.8537 | 11.7805|
+|12/13 | HARRIS/ORB |9.22307 | 13.4095|FAST/BRIEF |9.22307 | 11.6205|
+|13/14 | HARRIS/ORB |10.9678 | nan|FAST/BRIEF |10.9678 | 11.1323|
+|14/15 | HARRIS/ORB | 8.09422 | nan|FAST/BRIEF |8.09422 | 12.8498|
+|15/16 | HARRIS/ORB |3.17535 | 12.5305|FAST/BRIEF |3.17535 | 11.328|
+|16/17 | HARRIS/ORB | -9.99424 | nan|FAST/BRIEF |-9.99424 | 10.8182|
+|17/18 | HARRIS/ORB |8.30978 | nan|FAST/BRIEF |8.30978 | 11.8703|
