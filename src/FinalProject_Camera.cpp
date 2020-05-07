@@ -19,6 +19,7 @@
 #include "lidarData.hpp"
 #include "matching2D.hpp"
 #include "objectDetection2D.hpp"
+#include "visualizationHelper.h"
 
 using namespace std;
 
@@ -48,6 +49,9 @@ int main(int argc, const char *argv[])
     // Lidar
     string lidarPrefix = "KITTI/2011_09_26/velodyne_points/data/000000";
     string lidarFileType = ".bin";
+
+    // TTC result
+    vector<pair<double, double>> TTCresult;
 
     // calibration data for camera and lidar
     cv::Mat P_rect_00(3, 4, cv::DataType<double>::type); // 3x4 projection matrix after rectification
@@ -111,6 +115,14 @@ int main(int argc, const char *argv[])
 
     for (size_t imgIndex = 0; imgIndex <= imgEndIndex - imgStartIndex; imgIndex += imgStepWidth)
     {
+        if (imgIndex > 0)
+        {
+            cout << "=========== Processing frame " << imgIndex - 1 << " and frame " << imgIndex << " =========== " << endl;
+        }
+        else
+        {
+            cout << "=========== Processing first frame ===========" << endl;
+        }
         /* LOAD IMAGE INTO BUFFER */
 
         // assemble filenames for current index
@@ -241,7 +253,9 @@ int main(int argc, const char *argv[])
             //// STUDENT ASSIGNMENT
             //// TASK FP.1 -> match list of 3D objects (vector<BoundingBox>) between current and previous frame (implement ->matchBoundingBoxes)
             map<int, int> bbBestMatches;
-            matchBoundingBoxes(matches, bbBestMatches, *(dataBuffer.end() - 2), *(dataBuffer.end() - 1)); // associate bounding boxes between current and previous frame using keypoint matches
+
+            // associate bounding boxes between current and previous frame using keypoint matches
+            matchBoundingBoxes(matches, bbBestMatches, *(dataBuffer.end() - 2), *(dataBuffer.end() - 1));
             //// EOF STUDENT ASSIGNMENT
 
             // store matches in current data frame
@@ -272,8 +286,31 @@ int main(int argc, const char *argv[])
                     }
                 }
 
+                // bVis = true;
+                if (bVis)
+                {
+                    visualizeBoundingBox((dataBuffer.end() - 2)->cameraImg, *prevBB, "Bouding box previous frame");
+                }
+                if (bVis)
+                {
+                    visualizeBoundingBox((dataBuffer.end() - 1)->cameraImg, *currBB, "Bouding box current current");
+                }
+                bVis = false;
+
+                bool boundingBoxesCentered = false;
+                int currBoxCenterX = currBB->roi.x + 0.5 * currBB->roi.width;
+                int prevBoxCenterX = prevBB->roi.x + 0.5 * prevBB->roi.width;
+                auto currFrameWidth = (dataBuffer.end() - 1)->cameraImg.size().width;
+                auto prevFrameWidth = (dataBuffer.end() - 2)->cameraImg.size().width;
+                if (abs(currBoxCenterX - 0.5 * currFrameWidth) < (currFrameWidth / 4) &&
+                    abs(prevBoxCenterX - 0.5 * prevFrameWidth) < (prevFrameWidth / 4))
+                {
+                    boundingBoxesCentered = true;
+                }
+
                 // compute TTC for current match
-                if (currBB->lidarPoints.size() > 0 && prevBB->lidarPoints.size() > 0) // only compute TTC if we have Lidar points
+                // Only compute TTC if we have Lidar points and bounding boxes are centered
+                if (currBB->lidarPoints.size() > 0 && prevBB->lidarPoints.size() > 0 && boundingBoxesCentered)
                 {
                     //// STUDENT ASSIGNMENT
                     //// TASK FP.2 -> compute time-to-collision based on Lidar data (implement -> computeTTCLidar)
@@ -285,16 +322,32 @@ int main(int argc, const char *argv[])
                     //// TASK FP.3 -> assign enclosed keypoint matches to bounding box (implement -> clusterKptMatchesWithROI)
                     //// TASK FP.4 -> compute time-to-collision based on camera (implement -> computeTTCCamera)
                     double ttcCamera;
-                    clusterKptMatchesWithROI(*currBB, (dataBuffer.end() - 2)->keypoints, (dataBuffer.end() - 1)->keypoints, (dataBuffer.end() - 1)->kptMatches);
-                    computeTTCCamera((dataBuffer.end() - 2)->keypoints, (dataBuffer.end() - 1)->keypoints, currBB->kptMatches, sensorFrameRate, ttcCamera);
+                    clusterKptMatchesWithROI(*currBB,
+                                             *prevBB,
+                                             (dataBuffer.end() - 2)->keypoints,
+                                             (dataBuffer.end() - 1)->keypoints,
+                                             (dataBuffer.end() - 1)->kptMatches);
+
+                    computeTTCCamera((dataBuffer.end() - 2)->keypoints,
+                                     (dataBuffer.end() - 1)->keypoints,
+                                     currBB->kptMatches,
+                                     sensorFrameRate,
+                                     ttcCamera);
+                    // cout << "ttcCamera : " << ttcCamera << endl;
                     //// EOF STUDENT ASSIGNMENT
+
+                    TTCresult.push_back({ttcLidar, ttcCamera});
 
                     bVis = true;
                     if (bVis)
                     {
                         cv::Mat visImg = (dataBuffer.end() - 1)->cameraImg.clone();
                         showLidarImgOverlay(visImg, currBB->lidarPoints, P_rect_00, R_rect_00, RT, &visImg);
-                        cv::rectangle(visImg, cv::Point(currBB->roi.x, currBB->roi.y), cv::Point(currBB->roi.x + currBB->roi.width, currBB->roi.y + currBB->roi.height), cv::Scalar(0, 255, 0), 2);
+                        cv::rectangle(visImg,
+                                      cv::Point(currBB->roi.x, currBB->roi.y),
+                                      cv::Point(currBB->roi.x + currBB->roi.width,
+                                                currBB->roi.y + currBB->roi.height),
+                                      cv::Scalar(0, 255, 0), 2);
 
                         char str[200];
                         sprintf(str, "TTC Lidar : %f s, TTC Camera : %f s", ttcLidar, ttcCamera);
@@ -304,7 +357,7 @@ int main(int argc, const char *argv[])
                         cv::namedWindow(windowName, 4);
                         cv::imshow(windowName, visImg);
                         cout << "Press key to continue to next frame" << endl;
-                        cv::waitKey(0);
+                        // cv::waitKey(0);
                     }
                     bVis = false;
 
@@ -313,6 +366,12 @@ int main(int argc, const char *argv[])
         }
 
     } // eof loop over all images
+    for (int i = 0; i < TTCresult.size(); ++i)
+    {
+        cout << "TTC calculation between frame " << i << " and " << i + 1 << endl;
+        cout << "TTC Lidar : " << TTCresult[i].first << " TTC Camera : " << TTCresult[i].second << endl
+             << endl;
+    }
 
     return 0;
 }
