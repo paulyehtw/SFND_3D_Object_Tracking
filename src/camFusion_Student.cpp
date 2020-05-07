@@ -145,23 +145,57 @@ cv::Rect shrinkBoundingBox(const BoundingBox &originalBoundingBox, const float &
     return smallerBox;
 }
 
-// associate a given bounding box with the keypoints boundingBoxPrev contains
+// // associate a given bounding box with the keypoints it contains
 void clusterKptMatchesWithROI(BoundingBox &boundingBoxCurr,
+                              BoundingBox &boundingBoxPrev,
                               std::vector<cv::KeyPoint> &kptsPrev,
                               std::vector<cv::KeyPoint> &kptsCurr,
                               std::vector<cv::DMatch> &kptMatches)
 {
-    float shrinkFactor = 0.1; // Shrink bounding boxes 10% to reduce outliers
+    float shrinkFactor = 0.15; //Shrink bounding boxes 10 % to reduce outliers
+    std::vector<cv::DMatch> kptMatches_roi;
     cv::Rect smallerBoxCurr = shrinkBoundingBox(boundingBoxCurr, shrinkFactor);
+    cv::Rect smallerBoxPrev = shrinkBoundingBox(boundingBoxPrev, shrinkFactor);
 
     // Loop over each match to see if boudning box contains keypoints
     for (auto match : kptMatches)
     {
-        int currKeyPointIdx = match.trainIdx;
-        cv::Point currKeyPoint = kptsCurr.at(currKeyPointIdx).pt;
-        if (smallerBoxCurr.contains(currKeyPoint))
+        cv::KeyPoint currKeypoint = kptsCurr.at(match.trainIdx);
+        auto currCvPoint = cv::Point(currKeypoint.pt.x, currKeypoint.pt.y);
+
+        cv::KeyPoint prevKeypoint = kptsPrev.at(match.queryIdx);
+        auto prevCvPoint = cv::Point(prevKeypoint.pt.x, prevKeypoint.pt.y);
+
+        if (smallerBoxCurr.contains(currCvPoint) && smallerBoxPrev.contains(prevCvPoint))
         {
-            boundingBoxCurr.kptMatches.push_back(match);
+            kptMatches_roi.push_back(match);
+        }
+    }
+
+    double meanKeypointDist = 0.0;
+    for (auto kptMatch : kptMatches_roi)
+    {
+        meanKeypointDist += cv::norm(kptsCurr.at(kptMatch.trainIdx).pt - kptsPrev.at(kptMatch.queryIdx).pt);
+    }
+    // Calculate mean match distance
+    if (kptMatches_roi.size() > 0)
+    {
+        meanKeypointDist /= kptMatches_roi.size();
+    }
+    else
+    {
+        return;
+    }
+
+    // Keep the match distance < dist_mean * 1.5
+    double distThreshold = meanKeypointDist * 1.5;
+    for (auto kptMatch : kptMatches_roi)
+    {
+        float dist = cv::norm(kptsCurr.at(kptMatch.trainIdx).pt - kptsPrev.at(kptMatch.queryIdx).pt);
+        if (dist < distThreshold)
+        {
+            boundingBoxCurr.kptMatches.push_back(kptMatch);
+            boundingBoxPrev.kptMatches.push_back(kptMatch);
         }
     }
 }
