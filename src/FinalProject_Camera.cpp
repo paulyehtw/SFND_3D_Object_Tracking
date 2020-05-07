@@ -351,8 +351,9 @@ int main(int argc, const char *argv[])
 
                     TTCresult.push_back({ttcLidar, ttcCamera});
 
-                    bVis = true;
-                    if (bVis)
+                    bVis = false;
+                    bool bSaveImg = false;
+                    if (bVis || bSaveImg)
                     {
                         cv::Mat visImg = (dataBuffer.end() - 1)->cameraImg.clone();
                         showLidarImgOverlay(visImg, currBB->lidarPoints, P_rect_00, R_rect_00, RT, &visImg);
@@ -361,18 +362,25 @@ int main(int argc, const char *argv[])
                                       cv::Point(currBB->roi.x + currBB->roi.width,
                                                 currBB->roi.y + currBB->roi.height),
                                       cv::Scalar(0, 255, 0), 2);
-
                         char str[200];
                         sprintf(str, "TTC Lidar : %f s, TTC Camera : %f s", ttcLidar, ttcCamera);
                         putText(visImg, str, cv::Point2f(80, 50), cv::FONT_HERSHEY_PLAIN, 2, cv::Scalar(0, 0, 255));
-
-                        string windowName = "Final Results : TTC";
-                        cv::namedWindow(windowName, cv::WINDOW_AUTOSIZE);
-                        cv::imshow(windowName, visImg);
-                        cout << "Press key to continue to next frame" << endl;
-                        cv::waitKey(0);
+                        if (bVis)
+                        {
+                            string windowName = "Final Results : TTC";
+                            cv::namedWindow(windowName, cv::WINDOW_AUTOSIZE);
+                            cv::imshow(windowName, visImg);
+                            cout << "Press key to continue to next frame" << endl;
+                            cv::waitKey(0);
+                        }
+                        if (bSaveImg)
+                        {
+                            string resultPath = "../results/frame" + to_string(imgIndex - 1) + "_" + to_string(imgIndex) + ".jpg";
+                            cv::imwrite(resultPath, visImg);
+                        }
                     }
                     bVis = false;
+                    bSaveImg = false;
 
                 } // eof TTC computation
             }     // eof loop over all BB matches
