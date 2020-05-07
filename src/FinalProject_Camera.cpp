@@ -190,13 +190,27 @@ int main(int argc, const char *argv[])
         vector<cv::KeyPoint> keypoints; // create empty feature list for current image
         string detectorType = "SHITOMASI";
 
-        if (detectorType.compare("SHITOMASI") == 0)
+        if (detectorType == "SHITOMASI")
         {
             detKeypointsShiTomasi(keypoints, imgGray, false);
         }
+        else if (detectorType == "HARRIS")
+        {
+            detKeypointsHarris(keypoints, imgGray, false);
+        }
+        else if (detectorType == "FAST" ||
+                 detectorType == "BRISK" ||
+                 detectorType == "ORB" ||
+                 detectorType == "AKAZE" ||
+                 detectorType == "SIFT")
+        {
+            detKeypointsModern(keypoints, imgGray, detectorType, false);
+        }
         else
         {
-            //...
+            // Default keypoint detector
+            cout << "\033[1;33mNo keypoint detector is seletecd, using the Shi-Tomasi detector as default\033[0m\n";
+            detKeypointsShiTomasi(keypoints, imgGray, false);
         }
 
         // optional : limit number of keypoints (helpful for debugging and learning)
@@ -204,11 +218,8 @@ int main(int argc, const char *argv[])
         if (bLimitKpts)
         {
             int maxKeypoints = 50;
-
-            if (detectorType.compare("SHITOMASI") == 0)
-            { // there is no response info, so keep the first 50 as they are sorted in descending quality order
-                keypoints.erase(keypoints.begin() + maxKeypoints, keypoints.end());
-            }
+            // there is no response info, so keep the first 50 as they are sorted in descending quality order
+            keypoints.erase(keypoints.begin() + maxKeypoints, keypoints.end());
             cv::KeyPointsFilter::retainBest(keypoints, maxKeypoints);
             cout << " NOTE: Keypoints have been limited!" << endl;
         }
@@ -354,10 +365,10 @@ int main(int argc, const char *argv[])
                         putText(visImg, str, cv::Point2f(80, 50), cv::FONT_HERSHEY_PLAIN, 2, cv::Scalar(0, 0, 255));
 
                         string windowName = "Final Results : TTC";
-                        cv::namedWindow(windowName, 4);
+                        cv::namedWindow(windowName, cv::WINDOW_AUTOSIZE);
                         cv::imshow(windowName, visImg);
                         cout << "Press key to continue to next frame" << endl;
-                        // cv::waitKey(0);
+                        cv::waitKey(0);
                     }
                     bVis = false;
 
